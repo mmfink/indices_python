@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.org/monocongo/climate_indices.svg?master)](https://travis-ci.org/monocongo)
 [![Coverage Status](https://coveralls.io/repos/github/monocongo/climate_indices/badge.svg?branch=master)](https://coveralls.io/github/monocongo/climate_indices?branch=master)
 [![CodeFactor](https://www.codefactor.io/repository/github/monocongo/climate_indices/badge/master)](https://www.codefactor.io/repository/github/monocongo/climate_indices/overview/master)
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-green.svg)](https://opensource.org/licenses/BSD-3-Clause)
+[![License](https://img.shields.io/badge/license-Unlicense-green.svg)](https://unlicense.org/)
 
 # Climate Indices in Python
 
@@ -39,7 +39,7 @@ with the following goals in mind:
    documented code that is faithful to the relevant literature and
    which produces scientifically verifiable results
 -  to provide a central, open location for participation and collaboration 
-   among researchers, developers, and users of climate indices
+   for researchers, developers, and users of climate indices
 -  to facilitate standardization and consensus on best-of-breed
    climate index algorithms and corresponding compliant implementations in Python
 -  to provide transparency into the operational code used for climate
@@ -54,5 +54,5 @@ maintained by NIDIS/NCEI/NOAA. The official release version is available at
 [drought.gov](drought.gov).
 
 * [__Documentation__](https://climate-indices.readthedocs.io/en/latest/)
-* [__License__](LICENSE)
+* [__License__](UNLICENSE)
 * [__Disclaimer__](DISCLAIMER)

@@ -16,8 +16,8 @@
 .. |Dependencies| image:: https://gemnasium.com/badges/github.com/monocongo/climate_indices.svg
 
    :target: https://gemnasium.com/github.com/monocongo/climate_indices
-.. |License| image:: https://img.shields.io/badge/License-BSD%203--Clause-green.svg
-   :target: https://opensource.org/licenses/BSD-3-Clause
+.. |License| image:: https://img.shields.io/badge/license-Unlicense-green.svg
+   :target: https://unlicense.org/
 
 
 |Build| |Coverage| |CodeFactor| |License| 
@@ -59,7 +59,7 @@ with the following goals in mind:
    documented code that is faithful to the relevant literature and
    which produces scientifically verifiable results
 -  to provide a central, open location for participation and collaboration 
-   among researchers, developers, and users of climate indices
+   for researchers, developers, and users of climate indices
 -  to facilitate standardization and consensus on best-of-breed
    climate index algorithms and corresponding compliant implementations in Python
 -  to provide transparency into the operational code used for climate
@@ -171,9 +171,9 @@ These Python scripts are written to be run via bash shell commands, i.e.
 |                        | 'palmers' indicates all Palmer indices (PDSI,   |
 |                        | PHDI, PMDI, SCPDSI, and Z-Index).               |
 +------------------------+-------------------------------------------------+
-| time_series_type       | Whether input dataset files                     |
-|                        | represent monthly or daily data. Valid values   |
-|                        | are either 'monthly' or 'daily'.                |
+| periodicity            | The periodicity of the input dataset files.     |
+|                        | Valid values are 'monthly' and 'daily'.         |
+|                        | Note: only SPI and PNP support daily inputs.    |
 +------------------------+-------------------------------------------------+
 | netcdf_precip          | Input NetCDF file containing a                  |
 |                        | precipitation dataset, required for all         |
@@ -247,10 +247,10 @@ These Python scripts are written to be run via bash shell commands, i.e.
 Example Command Line Invocations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-PET monthly:
+PET monthly
 """"""""""""
 
-``$ python process_grid.py --index pet --time_series_type monthly --netcdf_temp  
+``$ python process_grid.py --index pet --periodicity monthly --netcdf_temp  
 ../example_inputs/nclimgrid_lowres_tavg.nc --var_name_temp tavg --output_file_base 
 /data/nclimgrid_lowres --calibration_start_year 1951 --calibration_end_year 2010``
 
@@ -260,10 +260,10 @@ resolution nClimGrid temperature dataset provided as an example input). The inpu
 dataset is monthly data and the calibration period used will be Jan. 1951 through 
 Dec. 2010. The output file will be `/data/nclimgrid_lowres_pet.nc`.
 
-SPI (both gamma and Pearson III distribution fittings), daily:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+SPI daily
+""""""""""
 
-``$ python process_grid.py --index spi  --time_series_type daily --netcdf_precip 
+``$ python process_grid.py --index spi  --periodicity daily --netcdf_precip 
 ../example_inputs/cmorph_lowres_daily_conus_prcp.nc --var_name_precip 
 prcp --output_file_base /data/cmorph_lowres_daily_conus --scales 30 90 
 --calibration_start_year 1998 --calibration_end_year 2016``
@@ -278,10 +278,10 @@ Jan. 1st, 1998 through Dec. 31st, 2016. The index will be computed at 30-day and
 `/data/cmorph_lowres_daily_conus_spi_pearson_30.nc`, and 
 `/data/cmorph_lowres_daily_conus_spi_pearson_90.nc`.
 
-SPI (both gamma and Pearson III distribution fittings), monthly:
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+SPI monthly
+""""""""""""
 
-``$ python process_grid.py --index spi --time_series_type monthly --netcdf_precip 
+``$ python process_grid.py --index spi --periodicity monthly --netcdf_precip 
 ../example_inputs/nclimgrid_lowres_prcp.nc --var_name_precip  prcp 
 --output_file_base /data/nclimgrid_lowres --scales 6 12 
 --calibration_start_year 1951 --calibration_end_year 2010``  
@@ -294,10 +294,10 @@ The output files will be `/data/nclimgrid_lowres_spi_gamma_06.nc`,
 `/data/nclimgrid_lowres_spi_gamma_12.nc`, `/data/nclimgrid_lowres_spi_pearson_06.nc`, 
 and `/data/nclimgrid_lowres_spi_pearson_12.nc`.
 
-SPEI (both gamma and Pearson III distribution fittings), monthly:
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+SPEI monthly
+"""""""""""""
 
-``$ python process_grid.py --index spei --time_series_type monthly --netcdf_precip 
+``$ python process_grid.py --index spei --periodicity monthly --netcdf_precip 
 ../example_inputs/nclimgrid_lowres_prcp.nc --var_name_precip  prcp --netcdf_pet 
 ../example_inputs/nclimgrid_lowres_pet.nc --var_name_pet pet --output_file_base 
 /data/nclimgrid_lowres --scales 9 18 --calibration_start_year 1951 --calibration_end_year 2010``  
@@ -310,9 +310,9 @@ datasets will be computed at 9-month and 18-month timescales. The output files w
 `/data/nclimgrid_lowres_spi_gamma_09.nc`, `/data/nclimgrid_lowres_spi_gamma_18.nc`, 
 `/data/nclimgrid_lowres_spi_pearson_09.nc`, and `/data/nclimgrid_lowres_spi_pearson_18.nc`.
 
-Palmers, monthly:
-""""""""""""""""""""""""""""""""
-``$ python process_grid.py --index palmers --time_series_type monthly --netcdf_precip 
+Palmers monthly
+""""""""""""""""
+``$ python process_grid.py --index palmers --periodicity monthly --netcdf_precip 
 ../example_inputs/nclimgrid_lowres_prcp.nc --var_name_precip prcp --netcdf_pet 
 ../example_inputs/nclimgrid_lowres_pet.nc --var_name_pet pet --netcdf_awc 
 ../example_inputs/nclimgrid_lowres_soil.nc  --var_name_awc awc --output_file_base 
@@ -328,7 +328,7 @@ data and the calibration period used will be Jan. 1951 through Dec. 2010. The ou
 `/data/nclimgrid_lowres_pmdi.nc`, `/data/nclimgrid_lowres_scpdsi.nc`, and `/data/nclimgrid_lowres_zindex.nc`.
 
 Get involved
-------------
+-------------
 
 Please use, make suggestions, and contribute to this code. Without
 diverse participation and community adoption this project will not reach
@@ -354,6 +354,6 @@ Copyright and licensing
 This is a developmental version of code that is originally developed at
 NCEI/NOAA, official release version available on
 `drought.gov <https://www.drought.gov/drought/python-climate-indices>`__.
-Please read more on our `license <LICENSE>`__ page.
+This software is in the public domain, with no copyright. Please read more on our `license <UNLICENSE>`__ page.
 
 
