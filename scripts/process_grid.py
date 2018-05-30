@@ -60,34 +60,34 @@ class GridProcessor(object):             # pragma: no cover
         self.var_name_awc = args.var_name_awc
         self.scales = args.scales
         self.calibration_start_year = args.calibration_start_year
-        self.calibration_end_year = args.calibration_end_year        
+        self.calibration_end_year = args.calibration_end_year
         self.index = args.index
         self.time_series_type = args.time_series_type
-        
+
         # determine the file to use for coordinate specs (years range and lat/lon sizes), get relevant units
         if self.index == 'pet':
-            
+
             # PET only requires temperature
             if self.netcdf_temp != None:
-                
+
                 # a PET file was not provided and we'll compute PET from temperature
                 self.units_temp = netcdf_utils.variable_units(self.netcdf_temp, self.var_name_temp)
 
                 # use the temperature file as the file that specifies the coordinate specs
                 coordinate_specs_file = self.netcdf_temp
-                
+
             else:
                 message = 'A temperature file was not specified, required for PET computation'
                 _logger.error(message)
                 raise ValueError(message)
-            
+
         else:
 
             # all other indices require precipitation
             if self.netcdf_precip != None:
 
                 self.units_precip = netcdf_utils.variable_units(self.netcdf_precip, self.var_name_precip)
-            
+
             else:
                 message = 'A precipitation file was not specified, required for all indices except PET'
                 _logger.error(message)
@@ -98,7 +98,7 @@ class GridProcessor(object):             # pragma: no cover
 
             # SPI and PNP only require precipitation
             if self.index not in ['spi', 'pnp']:
-                
+
                 # PET needs to be either provided or computed from temperature
                 if self.netcdf_pet != None:
                     # a PET file was provided
@@ -110,10 +110,10 @@ class GridProcessor(object):             # pragma: no cover
                     message = 'Neither a PET nor a temperature file was specified, required for all indices except SPI and PNP'
                     _logger.error(message)
                     raise ValueError(message)
-                    
+
                 # AWC is only required for Palmers
                 if self.index == 'palmers':
-                    
+
                     if self.netcdf_awc != None:
                         self.units_awc = netcdf_utils.variable_units(self.netcdf_awc, self.var_name_awc)
                         self.fill_value_awc = netcdf_utils.variable_fillvalue(self.netcdf_awc, self.var_name_awc)
@@ -121,22 +121,22 @@ class GridProcessor(object):             # pragma: no cover
                         message = 'No AWC file was specified, required for Palmers indices'
                         _logger.error(message)
                         raise ValueError(message)
-                        
+
         # get the coordinate related specs (time range, lat and lon sizes)
         self.data_start_year, self.data_end_year = netcdf_utils.initial_and_final_years(coordinate_specs_file)
         self.lat_size, self.lon_size = netcdf_utils.lat_and_lon_sizes(coordinate_specs_file)
-        
+
         # initialize the NetCDF files used for Palmers output, scaled indices will have corresponding files initialized at each scale run
         if self.index == 'palmers':
-        
-            # place holders for the scaled NetCDFs, these files will be created 
+
+            # place holders for the scaled NetCDFs, these files will be created
             # and assigned to these variables at each scale's computational iteration
             self.netcdf_pdsi = self.output_file_base + '_pdsi.nc'
             self.netcdf_phdi = self.output_file_base + '_phdi.nc'
             self.netcdf_pmdi = self.output_file_base + '_pmdi.nc'
             self.netcdf_scpdsi = self.output_file_base + '_scpdsi.nc'
             self.netcdf_zindex = self.output_file_base + '_zindex.nc'
-            
+
             netcdf_utils.initialize_netcdf_single_variable_grid(self.netcdf_pdsi,
                                                                 self.netcdf_precip,
                                                                 'pdsi',
@@ -169,7 +169,7 @@ class GridProcessor(object):             # pragma: no cover
                                                                 _VALID_MAX)
 
         elif self.index in ['spi', 'spei', 'pnp', 'scaled']:
-        
+
             # place holders for the scaled NetCDFs, these files will be created as needed
             # and assigned to these variables at each scale's computational iteration
             self.netcdf_spi_gamma = ''
@@ -196,10 +196,10 @@ class GridProcessor(object):             # pragma: no cover
                 raise ValueError(message)
         elif self.time_series_type != 'monthly':
             raise ValueError('Unsupported time series type argument: %s' % self.time_series_type)
-        
-        # dictionary of index types (ex. 'spi_gamma', 'spei_pearson', etc.) mapped to their corresponding long 
+
+        # dictionary of index types (ex. 'spi_gamma', 'spei_pearson', etc.) mapped to their corresponding long
         # variable names, to be used within the respective NetCDFs as variable long_name attributes
-        names_to_longnames = {}            
+        names_to_longnames = {}
         if self.index == 'spi':
             names_to_longnames['spi_gamma'] = 'Standardized Precipitation Index (Gamma distribution), ' + scale_type
             names_to_longnames['spi_pearson'] = 'Standardized Precipitation Index (Pearson Type III distribution), ' + scale_type
@@ -266,10 +266,10 @@ class GridProcessor(object):             # pragma: no cover
 
         # the number of worker processes we'll have in our process pool
         number_of_workers = multiprocessing.cpu_count()   # use 1 here for debugging
-    
+
         # all index combinations/bundles except SPI and PNP will require PET, so compute it here if required
         if (self.netcdf_pet is None) and (self.index in ['pet', 'spei', 'scaled', 'palmers']):
-        
+
             self.netcdf_pet = self.output_file_base + '_pet.nc'
             netcdf_utils.initialize_netcdf_single_variable_grid(self.netcdf_pet,
                                                                 self.netcdf_temp,
@@ -284,57 +284,57 @@ class GridProcessor(object):             # pragma: no cover
 
             # map the latitude indices as an arguments iterable to the compute function
             result = pool.map_async(self._process_latitude_pet, range(self.lat_size))
-    
+
             # get the exception(s) thrown, if any
             result.get()
-    
+
             # close the pool and wait on all processes to finish
             pool.close()
             pool.join()
 
         # compute indices other than PET if requested
         if self.index != 'pet':
-            
+
             if self.index in ['spi', 'spei', 'pnp', 'scaled']:
-                
+
                 for scale in self.scales:
-                    
+
                     self.timestep_scale = scale
-                    
+
                     self._initialize_scaled_netcdfs()
-                    
+
                     # create a process Pool for worker processes which will compute indices over an entire latitude slice
                     pool = multiprocessing.Pool(processes=number_of_workers)
 
                     # map the latitude indices as an arguments iterable to the compute function
                     result = pool.map_async(self._process_latitude_scaled, range(self.lat_size))
-            
+
                     # get the exception(s) thrown, if any
                     result.get()
-            
+
                     # close the pool and wait on all processes to finish
                     pool.close()
                     pool.join()
-                
+
             elif self.index == 'palmers':
-    
+
                 # create a process Pool for worker processes which will compute indices over an entire latitude slice
                 pool = multiprocessing.Pool(processes=number_of_workers)
 
                 # map the latitude indices as an arguments iterable to the compute function
                 result = pool.map_async(self._process_latitude_palmers, range(self.lat_size))
-        
+
                 # get the exception(s) thrown, if any
                 result.get()
-        
+
                 # close the pool and wait on all processes to finish
                 pool.close()
                 pool.join()
-                
+
             else:
-                            
+
                 raise ValueError('Unsupported index argument: %s' % self.index)
-    
+
 
     #-------------------------------------------------------------------------------------------------------------------
     def _process_latitude_scaled(self, lat_index):
@@ -348,7 +348,7 @@ class GridProcessor(object):             # pragma: no cover
         with netCDF4.Dataset(self.netcdf_precip) as dataset_precip:
 
             # read the latitude slice of input precipitation
-            lat_slice_precip = dataset_precip[self.var_name_precip][lat_index, :, :]   # assuming (lat, lon, time) orientation
+            lat_slice_precip = dataset_precip[self.var_name_precip][lat_index, :, :]   # TODO shouldn't assume (lat, lon, time) orientation
 
         if self.time_series_type == 'daily':
 
@@ -358,11 +358,11 @@ class GridProcessor(object):             # pragma: no cover
             # allocate an array to hold transformed time series where all years contain 366 days
             original_days_count = lat_slice_precip.shape[1]
             lat_slice_precip_all_leap = np.full((self.lon_size, total_years * 366), np.NaN)
-            
+
             # at each longitude we have a time series of values, loop over these longitudes and transform each
             # corresponding time series to 366 day years representation (fill Feb 29 during non-leap years)
             for lon_index in range(self.lon_size):  # TODO work out how to apply this across the lon axis, to eliminate this loop
-                
+
                 # transform the data so it represents all years containing 366 days, with Feb 29 containing fill value during non-leap years
                 lat_slice_precip_all_leap[lon_index, :] = utils.transform_to_366day(lat_slice_precip[lon_index, :],
                                                                                     self.data_start_year,
@@ -370,11 +370,11 @@ class GridProcessor(object):             # pragma: no cover
 
             # use the all leap daily values as the latitude slice we'll work on
             lat_slice_precip = lat_slice_precip_all_leap
-            
+
         # compute PNP if specified
         if self.index in ['pnp', 'scaled']:
 
-            if self.time_series_type == 'daily':  
+            if self.time_series_type == 'daily':
                 scale_increment = 'day'
             elif self.time_series_type == 'monthly':
                 scale_increment = 'month'
@@ -396,21 +396,21 @@ class GridProcessor(object):             # pragma: no cover
                 # is a fill value), loop over these longitudes and transform each corresponding time series back to a normal Gregorian calendar
                 lat_slice_pnp_gregorian = np.full((self.lon_size, original_days_count), np.NaN)
                 for lon_index in range(lat_slice_precip.shape[0]):
-                    
+
                     # transform the data so it represents mixed leap and non-leap years, i.e. normal Gregorian calendar
                     lat_slice_pnp_gregorian[lon_index, :] = utils.transform_to_gregorian(lat_slice_pnp[lon_index, :],
                                                                                          self.data_start_year)
 
                 # use the transformed arrays as the lat slice we'll write to the output NetCDF
                 lat_slice_pnp = lat_slice_pnp_gregorian
-            
+
             # use relevant variable name
             pnp_variable_name = 'pnp_' + str(self.timestep_scale).zfill(2)
 
             # open the existing PNP NetCDF file for writing, copy the latitude slice into the PNP variable at the indexed latitude position
             pnp_lock.acquire()
             pnp_dataset = netCDF4.Dataset(self.netcdf_pnp, mode='a')
-            pnp_dataset[pnp_variable_name][lat_index, :, :] = lat_slice_pnp   # assuming the NetCDF variable has (lat, lon, time) orientation
+            pnp_dataset[pnp_variable_name][lat_index, :, :] = lat_slice_pnp   # TODO shouldn't assume (lat, lon, time) orientation
             pnp_dataset.sync()
             pnp_dataset.close()
             pnp_lock.release()
@@ -418,7 +418,7 @@ class GridProcessor(object):             # pragma: no cover
         # compute SPI if specified
         if self.index in ['spi', 'scaled']:
 
-            if self.time_series_type == 'daily':  
+            if self.time_series_type == 'daily':
                 scale_increment = 'day'
             elif self.time_series_type == 'monthly':
                 scale_increment = 'month'
@@ -451,7 +451,7 @@ class GridProcessor(object):             # pragma: no cover
                 lat_slice_spi_gamma = np.full((self.lon_size, original_days_count), np.NaN)
                 lat_slice_spi_pearson = np.full((self.lon_size, original_days_count), np.NaN)
                 for lon_index in range(lat_slice_precip.shape[0]):
-                    
+
                     # transform the data so it represents mixed leap and non-leap years, i.e. normal Gregorian calendar
                     lat_slice_spi_gamma[lon_index, :] = utils.transform_to_gregorian(spi_gamma_lat_slice[lon_index, :],
                                                                                      self.data_start_year)
@@ -469,7 +469,7 @@ class GridProcessor(object):             # pragma: no cover
             # open the existing SPI/Gamma NetCDF file for writing, copy the latitude slice into the SPI variable at the indexed latitude position
             spi_gamma_lock.acquire()
             spi_gamma_dataset = netCDF4.Dataset(self.netcdf_spi_gamma, mode='a')
-            spi_gamma_dataset[spi_gamma_variable_name][lat_index, :, :] = spi_gamma_lat_slice   # (lat, lon, time)
+            spi_gamma_dataset[spi_gamma_variable_name][lat_index, :, :] = spi_gamma_lat_slice   # TODO shouldn't assume (lat, lon, time)
             spi_gamma_dataset.sync()
             spi_gamma_dataset.close()
             spi_gamma_lock.release()
@@ -477,7 +477,7 @@ class GridProcessor(object):             # pragma: no cover
             # open the existing SPI/Pearson NetCDF file for writing, copy the latitude slice into the SPI variable at the indexed latitude position
             spi_pearson_lock.acquire()
             spi_pearson_dataset = netCDF4.Dataset(self.netcdf_spi_pearson, mode='a')
-            spi_pearson_dataset[spi_pearson_variable_name][lat_index, :, :] = spi_pearson_lat_slice   # (lat, lon, time)
+            spi_pearson_dataset[spi_pearson_variable_name][lat_index, :, :] = spi_pearson_lat_slice   # TODO shouldn't assume (lat, lon, time)
             spi_pearson_dataset.sync()
             spi_pearson_dataset.close()
             spi_pearson_lock.release()
@@ -496,10 +496,10 @@ class GridProcessor(object):             # pragma: no cover
 
             # open the PET NetCDF within a context manager (this PET file should be present, either provided initially
             # as a command line argument to the script or computed from temperature earlier in the processing chain)
-            with netCDF4.Dataset(self.netcdf_pet) as dataset_pet:            
-                
+            with netCDF4.Dataset(self.netcdf_pet) as dataset_pet:
+
                 # read the latitude slice of input PET
-                lat_slice_pet = dataset_pet['pet'][lat_index, :, :]   # assuming (lat, lon, time) orientation
+                lat_slice_pet = dataset_pet['pet'][lat_index, :, :]   # TODO shouldn't assume (lat, lon, time) orientation
 
             # allocate latitude slices for SPEI output
             spei_gamma_lat_slice = np.full(lat_slice_precip.shape, np.NaN)
@@ -524,7 +524,7 @@ class GridProcessor(object):             # pragma: no cover
                                                                             self.calibration_end_year,
                                                                             precip_time_series,
                                                                             pet_mm=pet_time_series)
-               
+
                     # compute SPEI/Pearson
                     spei_pearson_lat_slice[lon_index, :] = indices.spei_pearson(self.timestep_scale,
                                                                                 self.time_series_type,
@@ -533,7 +533,7 @@ class GridProcessor(object):             # pragma: no cover
                                                                                 self.calibration_end_year,
                                                                                 precip_time_series,
                                                                                 pet_mm=pet_time_series)
-                 
+
             # use relevant variable names
             spei_gamma_variable_name = 'spei_gamma_' + str(self.timestep_scale).zfill(2)
             spei_pearson_variable_name = 'spei_pearson_' + str(self.timestep_scale).zfill(2)
@@ -568,47 +568,47 @@ class GridProcessor(object):             # pragma: no cover
         with netCDF4.Dataset(self.netcdf_temp) as temp_dataset:
 
             # read the latitude slice of input temperature values
-            temp_lat_slice = temp_dataset[self.var_name_temp][lat_index, :, :]   # assuming (lat, lon, time) orientation
+            temp_lat_slice = temp_dataset[self.var_name_temp][lat_index, :, :]   # TODO shouldn't assume (lat, lon, time) orientation
 
             #TODO verify that values are in degrees Celsius, if not then convert
-            
+
             # get the actual latitude value (assumed to be in degrees north) for the latitude slice specified by the index
             latitude_degrees_north = temp_dataset['lat'][lat_index]
 
             if self.time_series_type == 'daily':
 
-                pass  #placeholder 
-            
+                pass  #placeholder
+
 #                 # times are daily, transform to all leap year times (i.e. 366 days per year), so we fill Feb 29th of each non-leap missing
 #                 total_years = self.data_end_year - self.data_start_year + 1   # FIXME move this out of here, only needs to be computed once
-#      
+#
 #                 # allocate an array to hold transformed time series where all years contain 366 days
 #                 original_days_count = temp_lat_slice.shape[1]
 #                 temp_lat_slice_all_leap = np.full((self.lon_size, total_years * 366), np.NaN)
-#                 
+#
 #                 # at each longitude we have a time series of values, loop over these longitudes and transform each
 #                 # corresponding time series to 366 day years representation (fill Feb 29 during non-leap years)
 #                 for lon_index in range(self.lon_size):  # TODO work out how to apply this across the lon axis, to eliminate this loop
-#                     
+#
 #                     # transform the data so it represents all years containing 366 days, with Feb 29 containing fill value during non-leap years
 #                     temp_lat_slice_all_leap[lon_index, :] = utils.transform_to_366day(temp_lat_slice[lon_index, :],
 #                                                                                        self.data_start_year,
 #                                                                                        total_years)
-# 
+#
 #                 temp_lat_slice = temp_lat_slice_all_leap
-# 
+#
 #                 # compute PET across all longitudes of the latitude slice
 #                 pet_lat_slice = np.apply_along_axis(indices.pet_daily_hargreaves,
 #                                                     0,
 #                                                     temp_lat_slice,
 #                                                     latitude_degrees=latitude_degrees_north,
 #                                                     data_start_year=self.data_start_year)
-#                 
+#
 #                 # at each longitude we have a time series of values with a 366 day per year representation (Feb 29 during non-leap years
 #                 # is a fill value), loop over these longitudes and transform each corresponding time series back to a normal Gregorian calendar
 #                 lat_slice_pet = np.full((self.lon_size, original_days_count), np.NaN)
 #                 for lon_index in range(pet_lat_slice.shape[0]):
-#                     
+#
 #                     # transform the data so it represents mixed leap and non-leap years, i.e. normal Gregorian calendar
 #                     lat_slice_pet[lon_index, :] = utils.transform_to_gregorian(pet_lat_slice[lon_index, :],
 #                                                                                self.data_start_year)
@@ -626,7 +626,7 @@ class GridProcessor(object):             # pragma: no cover
             # open the existing PET NetCDF file for writing, copy the latitude slice into the PET variable at the indexed latitude position
             pet_lock.acquire()
             pet_dataset = netCDF4.Dataset(self.netcdf_pet, mode='a')
-            pet_dataset['pet'][lat_index, :, :] = pet_lat_slice   # this assumes (lat, lon, time), TODO make this more general to allow for other dimension orders, etc.
+            pet_dataset['pet'][lat_index, :, :] = pet_lat_slice   # TODO shouldn't assume (lat, lon, time)
             pet_dataset.sync()
             pet_dataset.close()
             pet_lock.release()
@@ -650,52 +650,72 @@ class GridProcessor(object):             # pragma: no cover
              netCDF4.Dataset(self.netcdf_awc) as dataset_awc:
 
             # read the latitude slice of input precipitation and PET values
-            lat_slice_precip = dataset_precip[self.var_name_precip][lat_index, :, :]    # assuming (time, lat, lon) orientation
-            lat_slice_pet = dataset_pet[self.var_name_pet][lat_index, :, :]             # assuming (lat, lon, time) orientation
+            dimensions = dataset_precip.variables[self.var_name_precip].dimensions
+            ddict = utils.check_dims('precipitation', dimensions, latposition=True)
+            if ddict['latpos'] == 1:
+                lat_slice_precip = dataset_precip[self.var_name_precip][lat_index, :, :]
+                lat_slice_pet = dataset_pet[self.var_name_pet][lat_index, :, :]
+            else:
+                tmp_slice_precip = dataset_precip[self.var_name_precip][:, lat_index, :]
+                lat_slice_precip = np.moveaxis(tmp_slice_precip, 0, -1)
+                tmp_slice_pet = dataset_pet[self.var_name_pet][:, lat_index, :]
+                lat_slice_pet = np.moveaxis(tmp_slice_pet, 0, -1)
 
-            # determine the dimensionality of the AWC dataset, in case there is 
+            # determine the dimensionality of the AWC dataset, in case there is
             # a missing time dimension, then get the AWC latitude slice accordingly
             awc_dims = dataset_awc[self.var_name_awc].dimensions
-            if awc_dims == ('time', 'lat', 'lon'):
-                awc_lat_slice = dataset_awc[self.var_name_awc][lat_index, :, 0].flatten()  # assuming (lat, lon, time) orientation
-            elif awc_dims == ('lat', 'lon'):
-                awc_lat_slice = dataset_awc[self.var_name_awc][lat_index, :].flatten()     # assuming (lat, lon) orientation
+            if len(awc_dims) == 3:
+                awcdict = utils.check_dims('AWS', awc_dims, latposition=True)
+                if awcdict['latpos'] == 1:
+                    awc_lat_slice = dataset_awc[self.var_name_awc][lat_index, :, 0].flatten()
+                else:
+                    awc_lat_slice = dataset_awc[self.var_name_awc][0, lat_index, :].flatten()
+#            if awc_dims == ('time', 'lat', 'lon'):
+#                awc_lat_slice = dataset_awc[self.var_name_awc][lat_index, :, 0].flatten()  # assuming (lat, lon, time) orientation
+#            elif awc_dims == ('lat', 'lon'):
+#                awc_lat_slice = dataset_awc[self.var_name_awc][lat_index, :].flatten()     # assuming (lat, lon) orientation
+            elif len(awc_dims) == 2:
+                awc_lat_slice = dataset_awc[self.var_name_awc][lat_index, :].flatten()
             else:
                 message = 'Unable to read the soil constant (AWC) values due to unsupported variable dimensions: {0}'.format(awc_dims)
                 _logger.error(message)
                 raise ValueError(message)
- 
+
         # allocate arrays to contain a latitude slice of Palmer values
         pdsi_lat_slice = np.full(lat_slice_precip.shape, np.NaN)
         phdi_lat_slice = np.full(lat_slice_precip.shape, np.NaN)
         zindex_lat_slice = np.full(lat_slice_precip.shape, np.NaN)
         scpdsi_lat_slice = np.full(lat_slice_precip.shape, np.NaN)
         pmdi_lat_slice = np.full(lat_slice_precip.shape, np.NaN)
-        
+
         # compute Palmer indices for each longitude from the latitude slice where we have valid inputs
         for lon_index in range(self.lon_size):
-        
+
             # get the time series values for this longitude
-            precip_time_series = lat_slice_precip[lon_index, :]
-            pet_time_series = lat_slice_pet[lon_index, :]
+            if ddict['latpos'] == 1:
+                precip_time_series = lat_slice_precip[lon_index, :]
+                pet_time_series = lat_slice_pet[lon_index, :]
+            else:
+                precip_time_series = lat_slice_precip[:, lon_index]
+                pet_time_series = lat_slice_pet[:, lon_index]
             awc = awc_lat_slice[lon_index]
-        
+
             # compute Palmer indices only if we have valid inputs
             if utils.is_data_valid(precip_time_series) and \
                utils.is_data_valid(pet_time_series) and \
                awc is not np.ma.masked and \
                not math.isnan(awc) and \
                not math.isclose(awc, self.fill_value_awc):
-        
+
                 # DEBUG ONLY -- REMOVE
                 _logger.debug('Computing Palmers for longitude index %s', lon_index)
-        
+
                 # put precipitation and PET into inches, if not already
                 if self.units_precip in _POSSIBLE_MM_UNITS:
                     precip_time_series = precip_time_series * _MM_TO_INCHES_FACTOR
                 if self.units_pet in _POSSIBLE_MM_UNITS:
                     pet_time_series = pet_time_series * _MM_TO_INCHES_FACTOR
-        
+
                 # compute Palmer indices
                 palmer_values = indices.scpdsi(precip_time_series,
                                                pet_time_series,
@@ -703,14 +723,14 @@ class GridProcessor(object):             # pragma: no cover
                                                self.data_start_year,
                                                self.calibration_start_year,
                                                self.calibration_end_year)
-        
+
                 # add the values into the slice, first clipping all values to the valid range
                 scpdsi_lat_slice[lon_index, :] = np.clip(palmer_values[0], _VALID_MIN, _VALID_MAX)
                 pdsi_lat_slice[lon_index, :] = np.clip(palmer_values[1], _VALID_MIN, _VALID_MAX)
                 phdi_lat_slice[lon_index, :] = np.clip(palmer_values[2], _VALID_MIN, _VALID_MAX)
                 pmdi_lat_slice[lon_index, :] = np.clip(palmer_values[3], _VALID_MIN, _VALID_MAX)
                 zindex_lat_slice[lon_index, :] = palmer_values[4]
-        
+
         # open the existing PDSI NetCDF file for writing, copy the latitude slice into the PET variable at the indexed latitude position
         pdsi_lock.acquire()
         pdsi_dataset = netCDF4.Dataset(self.netcdf_pdsi, mode='a')
@@ -718,7 +738,7 @@ class GridProcessor(object):             # pragma: no cover
         pdsi_dataset.sync()
         pdsi_dataset.close()
         pdsi_lock.release()
-        
+
         # open the existing PHDI NetCDF file for writing, copy the latitude slice into the PET variable at the indexed latitude position
         phdi_lock.acquire()
         phdi_dataset = netCDF4.Dataset(self.netcdf_phdi, mode='a')
@@ -726,7 +746,7 @@ class GridProcessor(object):             # pragma: no cover
         phdi_dataset.sync()
         phdi_dataset.close()
         phdi_lock.release()
-        
+
         # open the existing Z-Index NetCDF file for writing, copy the latitude slice into the Z-Index variable at the indexed latitude position
         zindex_lock.acquire()
         zindex_dataset = netCDF4.Dataset(self.netcdf_zindex, mode='a')
@@ -734,7 +754,7 @@ class GridProcessor(object):             # pragma: no cover
         zindex_dataset.sync()
         zindex_dataset.close()
         zindex_lock.release()
-        
+
         # open the existing SCPDSI NetCDF file for writing, copy the latitude slice into the scPDSI variable at the indexed latitude position
         scpdsi_lock.acquire()
         scpdsi_dataset = netCDF4.Dataset(self.netcdf_scpdsi, mode='a')
@@ -742,7 +762,7 @@ class GridProcessor(object):             # pragma: no cover
         scpdsi_dataset.sync()
         scpdsi_dataset.close()
         scpdsi_lock.release()
-        
+
         # open the existing PMDI NetCDF file for writing, copy the latitude slice into the PMDI variable at the indexed latitude position
         pmdi_lock.acquire()
         pmdi_dataset = netCDF4.Dataset(self.netcdf_pmdi, mode='a')
@@ -755,17 +775,17 @@ class GridProcessor(object):             # pragma: no cover
 def _validate_arguments(args):
     """
     Validate command line arguments to make sure proper argument combinations have been provided.
-    
+
     :param args: an arguments object of the type returned by argparse.ArgumentParser.parse_args()
     :raise ValueError: if one or more of the command line arguments is invalid
     """
-    
+
     # the dimensions we expect to find for each data variable (precipitation, temperature, and/or PET)
     expected_dimensions = ('lat', 'lon', 'time')
-    
+
     # all indices except PET require a precipitation file
     if args.index != 'pet':
-        
+
         # make sure a precipitation file was specified
         if args.netcdf_precip is None:
             msg = 'Missing the required precipitation file'
@@ -778,29 +798,30 @@ def _validate_arguments(args):
             _logger.error(message)
             raise ValueError(message)
 
-        # validate the precipitation file itself        
+        # validate the precipitation file itself
         with netCDF4.Dataset(args.netcdf_precip) as dataset_precip:
-            
+
             # make sure we have a valid precipitation variable name
             if args.var_name_precip not in dataset_precip.variables:
                 message = "Invalid precipitation variable name: \'%s\' does not exist in precipitation file \'%s\'" % args.var_name_precip, args.netcdf_precip
                 _logger.error(message)
                 raise ValueError(message)
-                
+
             # verify that the precipitation variable's dimensions are in the expected order
             dimensions = dataset_precip.variables[args.var_name_precip].dimensions
-            if dimensions != expected_dimensions:
-                message = "Invalid dimensions of the precipitation variable: {0}, (expected names and order: {1})".format(dimensions, expected_dimensions)
-                _logger.error(message)
-                raise ValueError(message)
-            
+            ddict = utils.check_dims('precipitation', dimensions, expected_dimensions)
+#            if dimensions != expected_dimensions:
+#                message = "Invalid dimensions of the precipitation variable: {0}, (expected names and order: {1})".format(dimensions, expected_dimensions)
+#                _logger.error(message)
+#                raise ValueError(message)
+
             # get the sizes of the latitude and longitude coordinate variables
-            lats_precip = dataset_precip.variables['lat'][:]
-            lons_precip = dataset_precip.variables['lon'][:]
-            times_precip = dataset_precip.variables['time'][:]
+            lats_precip = dataset_precip.variables[ddict['lat']][:]
+            lons_precip = dataset_precip.variables[ddict['lon']][:]
+            times_precip = dataset_precip.variables[ddict['time']][:]
 
     else:
-        
+
         # PET requires a temperature file
         if args.netcdf_temp is None:
             msg = 'Missing the required temperature file argument'
@@ -812,20 +833,20 @@ def _validate_arguments(args):
             msg = 'Invalid time series type argument for PET -- daily not yet supported'
             _logger.error(msg)
             raise ValueError(msg)
-                            
-    # SPEI and Palmers require either a PET file or a temperature file in order to compute PET  
-    if args.index in ['spei', 'scaled', 'palmers' ]:
-        
-        if args.netcdf_temp is None: 
-            
+
+    # SPEI and Palmers require either a PET file or a temperature file in order to compute PET
+    if args.index in ['spei', 'scaled', 'palmers']:
+
+        if args.netcdf_temp is None:
+
             if args.netcdf_pet is None:
                 msg = 'Missing the required temperature or PET files, neither were provided'
                 _logger.error(msg)
                 raise ValueError(msg)
-            
-            # validate the PET file        
+
+            # validate the PET file
             with netCDF4.Dataset(args.netcdf_pet) as dataset_pet:
-                
+
                 # make sure we have a valid PET variable name
                 if args.var_name_pet is None:
                     message = "Missing PET variable name"
@@ -835,40 +856,41 @@ def _validate_arguments(args):
                     message = "Invalid PET variable name: \'%s\' does not exist in PET file \'%s\'" % args.var_name_pet, args.netcdf_pet
                     _logger.error(message)
                     raise ValueError(message)
-                    
+
                 # verify that the PET variable's dimensions are in the expected order
                 dimensions = dataset_pet.variables[args.var_name_pet].dimensions
-                if dimensions != expected_dimensions:
-                    message = "Invalid dimensions of the PET variable: %s, (expected names and order: %s)" % dimensions, expected_dimensions
-                    _logger.error(message)
-                    raise ValueError(message)
-                
+                ddict = utils.check_dims('PET', dimensions, expected_dimensions)
+#                if dimensions != expected_dimensions:
+#                    message = "Invalid dimensions of the PET variable: %s, (expected names and order: %s)" % dimensions, expected_dimensions
+#                    _logger.error(message)
+#                    raise ValueError(message)
+
                 # verify that the coordinate variables match with those of the precipitation dataset
-                if not np.array_equal(lats_precip, dataset_pet.variables['lat'][:]):
+                if not np.array_equal(lats_precip, dataset_pet.variables[ddict['lat']][:]):
                     message = "Precipitation and PET variables contain non-matching latitudes"
                     _logger.error(message)
                     raise ValueError(message)
-                elif not np.array_equal(lons_precip, dataset_pet.variables['lon'][:]):
+                elif not np.array_equal(lons_precip, dataset_pet.variables[ddict['lon']][:]):
                     message = "Precipitation and PET variables contain non-matching longitudes"
                     _logger.error(message)
                     raise ValueError(message)
-                elif not np.array_equal(times_precip, dataset_pet.variables['time'][:]):
+                elif not np.array_equal(times_precip, dataset_pet.variables[ddict['time']][:]):
                     message = "Precipitation and PET variables contain non-matching times"
                     _logger.error(message)
                     raise ValueError(message)
 
-        elif args.netcdf_pet is not None: 
+        elif args.netcdf_pet is not None:
 
-            # we can't have both temperature and PET files specified, no way to determine which to use            
+            # we can't have both temperature and PET files specified, no way to determine which to use
             msg = 'Both temperature and PET files were specified, only one of these should be provided'
             _logger.error(msg)
             raise ValueError(msg)
 
         else:
-            
-            # validate the temperature file        
+
+            # validate the temperature file
             with netCDF4.Dataset(args.netcdf_temp) as dataset_temp:
-                
+
                 # make sure we have a valid temperature variable name
                 if args.var_name_temp is None:
                     message = "Missing temperature variable name"
@@ -878,41 +900,42 @@ def _validate_arguments(args):
                     message = "Invalid temperature variable name: \'%s\' does not exist in temperature file \'%s\'" % args.var_name_temp, args.netcdf_temp
                     _logger.error(message)
                     raise ValueError(message)
-                    
+
                 # verify that the temperature variable's dimensions are in the expected order
                 dimensions = dataset_temp.variables[args.var_name_temp].dimensions
-                if dimensions != expected_dimensions:
-                    message = "Invalid dimensions of the temperature variable: %s, (expected names and order: %s)" % dimensions, expected_dimensions
-                    _logger.error(message)
-                    raise ValueError(message)
-                
+                ddict = utils.check_dims('temperature', dimensions, expected_dimensions)
+#                if dimensions != expected_dimensions:
+#                    message = "Invalid dimensions of the temperature variable: %s, (expected names and order: %s)" % dimensions, expected_dimensions
+#                    _logger.error(message)
+#                    raise ValueError(message)
+
                 # verify that the coordinate variables match with those of the precipitation dataset
-                if not np.array_equal(lats_precip, dataset_temp.variables['lat'][:]):
+                if not np.array_equal(lats_precip, dataset_temp.variables[ddict['lat']][:]):
                     message = "Precipitation and temperature variables contain non-matching latitudes"
                     _logger.error(message)
                     raise ValueError(message)
-                elif not np.array_equal(lons_precip, dataset_temp.variables['lon'][:]):
+                elif not np.array_equal(lons_precip, dataset_temp.variables[ddict['lon']][:]):
                     message = "Precipitation and temperature variables contain non-matching longitudes"
                     _logger.error(message)
                     raise ValueError(message)
-                elif not np.array_equal(times_precip, dataset_temp.variables['time'][:]):
+                elif not np.array_equal(times_precip, dataset_temp.variables[ddict['time']][:]):
                     message = "Precipitation and temperature variables contain non-matching times"
                     _logger.error(message)
                     raise ValueError(message)
 
         # Palmers requires an available water capacity file
         if args.index in ['palmers']:
-        
-            if args.netcdf_awc is None: 
-                
+
+            if args.netcdf_awc is None:
+
                 msg = 'Missing the required available water capacity file'
                 _logger.error(msg)
                 raise ValueError(msg)
-                
-            # validate the AWC file        
+
+            # validate the AWC file
             with netCDF4.Dataset(args.netcdf_awc) as dataset_awc:
-                
-                # make sure we have a valid PET variable name
+
+                # make sure we have a valid AWC variable name
                 if args.var_name_awc is None:
                     message = "Missing the AWC variable name"
                     _logger.error(message)
@@ -921,36 +944,37 @@ def _validate_arguments(args):
                     message = "Invalid AWC variable name: \'%s\' does not exist in AWC file \'%s\'", args.var_name_awc, args.netcdf_awc
                     _logger.error(message)
                     raise ValueError(message)
-                    
+
                 # verify that the AWC variable's dimensions are in the expected order
                 dimensions = dataset_awc.variables[args.var_name_awc].dimensions
-                if (dimensions != ('lat', 'lon')) and (dimensions != expected_dimensions):
-                    message = "Invalid dimensions of the AWC variable: %s, (expected names and order: %s)".format(dimensions, expected_dimensions)
-                    _logger.error(message)
-                    raise ValueError(message)
-                
+                ddict = utils.check_dims('AWC', dimensions, expected=('lat', 'lon'))
+#                if (dimensions != ('lat', 'lon')) and (dimensions != expected_dimensions):
+#                    message = "Invalid dimensions of the AWC variable: %s, (expected names and order: %s)".format(dimensions, expected_dimensions)
+#                    _logger.error(message)
+#                    raise ValueError(message)
+
                 # verify that the latitude and longitude coordinate variables match with those of the precipitation dataset
-                if not np.array_equal(lats_precip, dataset_awc.variables['lat'][:]):
+                if not np.array_equal(lats_precip, dataset_awc.variables[ddict['lat']][:]):
                     message = "Precipitation and AWC variables contain non-matching latitudes"
                     _logger.error(message)
                     raise ValueError(message)
-                elif not np.array_equal(lons_precip, dataset_awc.variables['lon'][:]):
+                elif not np.array_equal(lons_precip, dataset_awc.variables[ddict['lon']][:]):
                     message = "Precipitation and AWC variables contain non-matching longitudes"
                     _logger.error(message)
                     raise ValueError(message)
 
-    if args.index in ['spi', 'spei', 'scaled', 'pnp' ]:
-        
+    if args.index in ['spi', 'spei', 'scaled', 'pnp']:
+
         if args.scales is None:
             message = "Scaled indices (SPI, SPEI, and/or PNP) specified without including one or more time scales (missing --scales argument)"
             _logger.error(message)
             raise ValueError(message)
-        
+
         if any(n < 0 for n in args.scales):
             message = "One or more negative scale specified within --scales argument"
             _logger.error(message)
             raise ValueError(message)
-    
+
 #-----------------------------------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     """
@@ -1010,20 +1034,20 @@ if __name__ == '__main__':
                             required=True)
         args = parser.parse_args()
 
-        
+
         '''
         Example command line arguments for SPI only using monthly precipitation input:
-        
+
         --netcdf_precip /tmp/jadams/cmorph_daily_prcp_199801_201707.nc --var_name_precip prcp --output_file_base ~/data/cmorph/spi/cmorph --scales 1 2 3 6 9 12 24 --calibration_start_year 1998 --calibration_end_year 2016 --index spi /tmp/jadams --time_series_type monthly
         '''
 
         # validate the command line arguments
         _validate_arguments(args)
-                    
+
         # perform the processing
-        grid_processor = GridProcessor(args)        
+        grid_processor = GridProcessor(args)
         grid_processor.run()
-            
+
         # report on the elapsed time
         end_datetime = datetime.now()
         _logger.info("End time:      %s", end_datetime)
