@@ -23,25 +23,30 @@ def check_dims(which, dims, expected=('lat', 'lon', 'time'), latposition=False):
     :return: dictionary giving actual dimension names and, optionally, the position of the latitude dimension
     """
     if dims != expected:
-        opt_one = ('latitude', 'longitude', 'time')
-        opt_two = ('time', 'latitude', 'longitude')
-        opt_three = ('time', 'lat', 'lon')
-        if dims == opt_one:
-            dimdict = dict(zip(expected, opt_one))
-            if latposition:
-                dimdict.update({'latpos':1})
-        elif dims == opt_two:
-            dimdict = dict(zip(expected, opt_one))
-            if latposition:
-                dimdict.update({'latpos':2})
-        elif dims == opt_three:
-            dimdict = dict(zip(expected, expected))
-            if latposition:
-                dimdict.update({'latpos':2})
+        if len(dims) == 2:
+            opt_one = ('latitude', 'longitude')
+            opt_two = ('lon', 'lat')
+            opt_three = ('x', 'y')
         else:
-            message = "Invalid dimensions of the {2} variable: {0}, (expected names and order: {1})".format(dims, expected, which)
-            _logger.error(message)
-            raise ValueError(message)
+            opt_one = ('latitude', 'longitude', 'time')
+            opt_two = ('time', 'latitude', 'longitude')
+            opt_three = ('time', 'lat', 'lon')
+            if dims == opt_one:
+                dimdict = dict(zip(expected, opt_one))
+                if latposition:
+                    dimdict.update({'latpos':1})
+            elif dims == opt_two:
+                dimdict = dict(zip(expected, opt_one))
+                if latposition:
+                    dimdict.update({'latpos':2})
+            elif dims == opt_three:
+                dimdict = dict(zip(expected, expected))
+                if latposition:
+                    dimdict.update({'latpos':2})
+            else:
+                message = "Invalid dimensions of the {2} variable: {0}, (expected names and order: {1})".format(dims, expected, which)
+                _logger.error(message)
+                raise ValueError(message)
     else:
         dimdict = dict(zip(expected, expected))
         if latposition:
